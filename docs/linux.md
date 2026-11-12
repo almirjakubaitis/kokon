@@ -105,7 +105,7 @@ qemu-x86_64 -cpu Nehalem target/release/kokon-mcp --version
 
 The manual **Portable CPU release** workflow (`.github/workflows/portable-cpu.yml`) runs exactly
 this on Ubuntu 22.04 and uploads the `.deb` and `.rpm` (and builds the Windows installer on
-`windows-latest`).
+`windows-2022`).
 
 ## Building and testing the Linux app
 

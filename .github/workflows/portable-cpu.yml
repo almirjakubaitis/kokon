@@ -1,7 +1,7 @@
 # Builds the release packages with a portable ONNX Runtime, so they run on SSE4.2 CPUs
 # (Xeon X5670) as well as on AVX2/AVX-512 machines:
 #   linux   -> .deb + .rpm on Ubuntu 22.04 (glibc 2.35)
-#   windows -> NSIS setup.exe on windows-latest (MSVC)
+#   windows -> NSIS setup.exe on windows-2022 (MSVC)
 # Both link tools/ort-portable; MLAS still picks its AVX/AVX2/AVX-512 kernels at runtime.
 #
 # Manual run only: Actions -> "Portable CPU release" -> Run workflow.
@@ -95,8 +95,11 @@ jobs:
 
   # The normal Windows path is the maintainer's machine (docs/releasing.md); this job makes a
   # portable build reproducible on a clean runner. First run: the ONNX Runtime build is ~1 h.
+  # windows-2022 on purpose: it ships the Visual Studio 2022 C++ toolchain that ONNX Runtime
+  # v1.31 is tested with (windows-latest has moved to a newer Visual Studio; the ORT script
+  # detects it, but the known-good image keeps release builds reproducible).
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     env:
       ORT_VERSION: ${{ inputs.ort_version }}
     steps:
@@ -110,8 +113,15 @@ jobs:
             package-lock.json
             mcp/package-lock.json
 
+      # mcp/ is not an npm workspace: it has its own lockfile and dev dependencies (esbuild,
+      # postject, vitest) that scripts\build-release.ps1 only assumes are installed.
       - name: Install packages
-        run: npm ci --no-audit --no-fund
+        shell: pwsh
+        run: |
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Push-Location mcp
+          npm ci --no-audit --no-fund
 
       - name: Cache portable ONNX Runtime
         id: ort-cache
@@ -119,6 +129,26 @@ jobs:
         with:
           path: ~\kokon-deps\ort-portable
           key: ort-portable-${{ inputs.ort_version }}-windows-x86_64-msvc-r1
+
+      # One line that makes a failed dependency build diagnosable without a second run.
+      - name: Toolchain report
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+            $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion
+            Write-Host "Visual Studio: $vs"
+          } else {
+            Write-Host "Visual Studio: vswhere not found"
+          }
+          cmake --version | Select-Object -First 1
+          if (Get-Command ninja -ErrorAction SilentlyContinue) { ninja --version }
+          else { Write-Host "ninja: not installed (fine: the ORT script uses the Visual Studio generator)" }
+          cargo --version
+          rustc --version
+          Get-PSDrive -PSProvider FileSystem |
+            Format-Table Name, @{n = 'FreeGB'; e = { [math]::Round($_.Free / 1GB, 1) } } -AutoSize |
+            Out-String | Write-Host
 
       - name: Build portable ONNX Runtime (MSVC)
         if: steps.ort-cache.outputs.cache-hit != 'true'

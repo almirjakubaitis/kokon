@@ -51,9 +51,10 @@ all three from the same code.
 
    As an alternative to a local machine, the manual **Portable CPU release** workflow
    (`.github/workflows/portable-cpu.yml`) builds the same Linux packages on Ubuntu 22.04 and the
-   Windows installer on `windows-latest`, caching the portable runtime and uploading both as
-   artifacts. Without the `TAURI_SIGNING_PRIVATE_KEY` secret they are signed with a throwaway key
-   and cannot update official installs.
+   Windows installer on `windows-2022` (the image with the Visual Studio 2022 C++ toolchain),
+   caching the portable runtime and uploading both as artifacts. Without the
+   `TAURI_SIGNING_PRIVATE_KEY` secret they are signed with a throwaway key and cannot update
+   official installs.
 4. **Write the manifest:**
    `node scripts/release/updater.mjs manifest --notes "What changed, in one or two lines"`
    (`latest.json` must list Windows, macOS and both Linux packages).

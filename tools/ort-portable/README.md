@@ -44,7 +44,13 @@ $env:ORT_LIB_LOCATION = "$env:USERPROFILE\kokon-deps\ort-portable\lib"
 powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
 ```
 
-Needs Visual Studio 2022 (Desktop C++), CMake ≥ 3.26, Python 3 and Git.
+Needs Visual Studio 2022 or newer (Desktop C++), CMake ≥ 3.26, Python 3 and Git.
+
+The script asks `vswhere` which Visual Studio is installed and picks the matching CMake
+generator; if CMake cannot use it (a newer Visual Studio, a runner image without the Visual
+Studio generator), it retries with Ninja after importing the MSVC environment from
+`vcvarsall.bat`. `KOKON_CMAKE_GENERATOR` overrides the choice, e.g. `Ninja` from a Developer
+PowerShell.
 
 ## Requirements and notes
 
