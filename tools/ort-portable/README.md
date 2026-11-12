@@ -57,6 +57,11 @@ PowerShell.
 - ONNX Runtime **v1.31.0** is the version `ort = 2.0.0-rc.14` (feature `api-31`) expects.
   Change `ORT_VERSION` and `ort` together.
 - The build is large: a few GB of disk and ~30–90 minutes depending on the machine.
+- The assembler must know the **AVX512-FP16** mnemonics for MLAS's `x86_64/cvtfp16Avx.S`; CMake
+  forwards no `-m` flags to it. GNU as 2.38 (Ubuntu 22.04, the CI image) does not, as 2.42 does.
+  `build-ort-portable.sh` checks this and skips the file and the reference to its kernel when the
+  assembler cannot assemble it: that kernel is only chosen on an AVX512-FP16 CPU, so the library
+  behaves the same on every CPU Kokon supports.
 - Build Linux releases on **Ubuntu 22.04** (glibc 2.35) so the static archive and the app match
   the supported floor. The local Mint 24.04 build is for validation only.
 - Do not add `-march=native`, `/arch:AVX`, `/arch:AVX2`, or turn `USE_AVX2` back on: that

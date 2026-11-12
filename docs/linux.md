@@ -95,6 +95,13 @@ runtime: one binary, SSE4.2 on old CPUs, AVX2/AVX-512 on new ones. Windows uses 
 with MSVC (`tools/ort-portable/build-ort-portable.ps1`). Do not add `-march=native` or turn
 `USE_AVX2` back on. Background: [engineering-notes.md](engineering-notes.md).
 
+The assembler is part of the toolchain here: MLAS's `x86_64/cvtfp16Avx.S` uses AVX512-FP16
+mnemonics, and CMake forwards no `-m` flags to `as`. GNU as 2.38 (Ubuntu 22.04, so the CI) does
+not know them, as 2.42 does — the CI job stopped at that file. The build script checks the
+assembler and skips that file and the reference to its kernel when it cannot assemble it; that
+kernel is chosen only on an AVX512-FP16 CPU, so nothing changes for the CPUs Kokon supports
+(MLAS uses its SSE2 kernel, exactly as on macOS).
+
 To check a build without an old CPU at hand, run it under QEMU's Nehalem model (SSE4.2 +
 POPCNT, no AVX). The 0.12.1 binary fails there exactly as it did on the Xeon:
 

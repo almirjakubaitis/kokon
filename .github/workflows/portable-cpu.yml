@@ -39,7 +39,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/kokon-deps/ort-portable
-          key: ort-portable-${{ inputs.ort_version }}-linux-x86_64-v2-r1
+          key: ort-portable-${{ inputs.ort_version }}-linux-x86_64-v2-r2
 
       - name: Build portable ONNX Runtime
         if: steps.ort-cache.outputs.cache-hit != 'true'

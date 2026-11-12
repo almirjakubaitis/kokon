@@ -38,6 +38,28 @@ if command -v gcc-13 >/dev/null && command -v g++-13 >/dev/null; then
   export CXX="${CXX:-g++-13}"
 fi
 
+# MLAS keeps its FP16 conversion kernel in x86_64/cvtfp16Avx.S, with AVX512-FP16 mnemonics. CMake
+# does not forward -m flags to the assembler, so that file assembles only when GNU as knows them:
+# as 2.42 (this machine) does, Ubuntu 22.04's 2.38 does not — that is why the CI job failed there.
+# The kernel is picked at runtime only on a CPU with AVX512-FP16, so when the assembler cannot
+# assemble it, skip the file and the reference to it: the library still runs on every CPU Kokon
+# supports, and MLAS uses its SSE2 kernel there, as it does on macOS.
+if [ "$(uname -m)" = "x86_64" ] || [ "$(uname -m)" = "amd64" ]; then
+  TMP="${TMPDIR:-/tmp}/kokon-ort-portable"
+  mkdir -p "$TMP"
+  printf '.intel_syntax noprefix\n\tvcvtneeph2ps ymm0, ymmword PTR [rdi]\n' > "$TMP/fp16.s"
+  if command -v as >/dev/null && ! as -o "$TMP/fp16.o" "$TMP/fp16.s" 2>/dev/null; then
+    echo "as does not know the AVX512-FP16 mnemonics ($(as --version | head -1))"
+    echo "  Skipping MLAS's x86_64/cvtfp16Avx.S and the reference to its kernel."
+    if [ -d "$SRC/.git" ]; then git -C "$SRC" checkout -- cmake/onnxruntime_mlas.cmake onnxruntime/core/mlas/lib/platform.cpp; fi
+    sed -i 's|^\s*${MLAS_SRC_DIR}/x86_64/cvtfp16Avx\.S|        # cvtfp16Avx.S: assembler without AVX512-FP16|' "$SRC/cmake/onnxruntime_mlas.cmake"
+    sed -i 's|this->CastF16ToF32Kernel = &MlasCastF16ToF32KernelAvx;|            /* assembler without AVX512-FP16: no kernel */|' "$SRC/onnxruntime/core/mlas/lib/platform.cpp"
+    if grep -q '${MLAS_SRC_DIR}/x86_64/cvtfp16Avx\.S' "$SRC/cmake/onnxruntime_mlas.cmake"; then
+      echo "  These patterns are for ONNX Runtime $ORT_VERSION; they did not match, so the build will stop at that file."
+    fi
+  fi
+fi
+
 GEN=()
 if command -v ninja >/dev/null; then
   GEN=(-G Ninja)
