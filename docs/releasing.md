@@ -48,6 +48,12 @@ all three from the same code.
    `bash tools/ort-portable/build-ort-portable.sh` on Linux; or point `ORT_LIB_LOCATION` at an
    existing build. The scripts stop with a clear message if it is missing
    ([tools/ort-portable/README.md](../tools/ort-portable/README.md)).
+
+   As an alternative to a local machine, the manual **Portable CPU release** workflow
+   (`.github/workflows/portable-cpu.yml`) builds the same Linux packages on Ubuntu 22.04 and the
+   Windows installer on `windows-latest`, caching the portable runtime and uploading both as
+   artifacts. Without the `TAURI_SIGNING_PRIVATE_KEY` secret they are signed with a throwaway key
+   and cannot update official installs.
 4. **Write the manifest:**
    `node scripts/release/updater.mjs manifest --notes "What changed, in one or two lines"`
    (`latest.json` must list Windows, macOS and both Linux packages).

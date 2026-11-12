@@ -103,6 +103,10 @@ qemu-x86_64 -cpu Nehalem target/release/kokon-service --version
 qemu-x86_64 -cpu Nehalem target/release/kokon-mcp --version
 ```
 
+The manual **Portable CPU release** workflow (`.github/workflows/portable-cpu.yml`) runs exactly
+this on Ubuntu 22.04 and uploads the `.deb` and `.rpm` (and builds the Windows installer on
+`windows-latest`).
+
 ## Building and testing the Linux app
 
 - Build machine: **WSL Ubuntu-22.04** on the dev PC (installed 2026-10-16; sees the RTX 5070 Ti through
