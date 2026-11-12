@@ -1,0 +1,58 @@
+# Portable ONNX Runtime for Kokon
+
+`ort`'s prebuilt ONNX Runtime binaries are built with an **AVX2 baseline**
+(`-march=x86-64-v3` on Linux, `/arch:AVX2` on Windows). On a CPU without AVX2 — a Xeon X5670
+(SSE4.2, no AVX) or any pre-2011 processor — `kokon-service` stops with `SIGILL` in a static
+initializer before `main`, so the app cannot start. See [docs/linux.md](../../docs/linux.md).
+
+This folder builds ONNX Runtime from source with the **lowest baseline Kokon supports** while
+keeping MLAS's AVX/AVX2/AVX-512 kernels, which ONNX Runtime chooses **at runtime**:
+
+| Platform | Baseline | Why |
+|---|---|---|
+| Linux x86-64 | `-march=x86-64-v2` (SSE4.2 + POPCNT) | same floor as the Rust code |
+| Windows x64 | MSVC default (SSE2) + no `/arch:AVX*` | runs on every supported CPU |
+
+`onnxruntime_USE_AVX`, `onnxruntime_USE_AVX2` and `onnxruntime_USE_AVX512` are **OFF**: they
+change the baseline of the non-MLAS code. MLAS still compiles the fast kernels with their own
+per-file flags (`-mavx2`, …) and picks one with `GetMlasPlatform()` at runtime, so a modern CPU
+keeps AVX2/AVX-512 performance.
+
+The CMake wrapper bundles ONNX Runtime's static libraries into one archive
+(`libonnxruntime.a` / `onnxruntime.lib`), the layout `ort-sys` expects when `ORT_LIB_LOCATION`
+points at the folder. It is based on
+[pykeio/ort-artifacts `src/static-build/CMakeLists.txt`](https://github.com/pykeio/ort-artifacts/blob/main/src/static-build/CMakeLists.txt)
+(Apache-2.0).
+
+## Linux
+
+```bash
+bash tools/ort-portable/build-ort-portable.sh          # add --clean to rebuild from scratch
+export ORT_LIB_LOCATION=$HOME/kokon-deps/ort-portable/lib
+cargo build -p qls-service --release
+./target/release/kokon-service --version                # must not SIGILL on SSE4.2
+```
+
+The release script (`scripts/build-release-linux.sh`) defaults to
+`$HOME/kokon-deps/ort-portable/lib` and stops with a clear message if it is missing.
+
+## Windows
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\ort-portable\build-ort-portable.ps1
+$env:ORT_LIB_LOCATION = "$env:USERPROFILE\kokon-deps\ort-portable\lib"
+powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
+```
+
+Needs Visual Studio 2022 (Desktop C++), CMake ≥ 3.26, Python 3 and Git.
+
+## Requirements and notes
+
+- ONNX Runtime **v1.31.0** is the version `ort = 2.0.0-rc.14` (feature `api-31`) expects.
+  Change `ORT_VERSION` and `ort` together.
+- The build is large: a few GB of disk and ~30–90 minutes depending on the machine.
+- Build Linux releases on **Ubuntu 22.04** (glibc 2.35) so the static archive and the app match
+  the supported floor. The local Mint 24.04 build is for validation only.
+- Do not add `-march=native`, `/arch:AVX`, `/arch:AVX2`, or turn `USE_AVX2` back on: that
+  reintroduces the crash on SSE4.2/AVX-only CPUs.
+- Verify the result on the oldest CPU available (this repository's target is a Xeon X5670).

@@ -10,6 +10,15 @@ $root = Resolve-Path "$PSScriptRoot\.."
 Set-Location $root
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 
+# ort's prebuilt ONNX Runtime needs AVX2 and stops with SIGILL on older CPUs (#53). Link the
+# portable one built by tools\ort-portable\build-ort-portable.ps1 instead (docs/releasing.md).
+if (-not $env:ORT_LIB_LOCATION) {
+    $env:ORT_LIB_LOCATION = Join-Path $env:USERPROFILE 'kokon-deps\ort-portable\lib'
+}
+if (-not (Test-Path (Join-Path $env:ORT_LIB_LOCATION 'onnxruntime.lib'))) {
+    throw "Portable ONNX Runtime not found: $env:ORT_LIB_LOCATION\onnxruntime.lib. Build it first: powershell -ExecutionPolicy Bypass -File tools\ort-portable\build-ort-portable.ps1"
+}
+
 Write-Host "1/5 Tests (Rust core + frontend + MCP)" -ForegroundColor Cyan
 cargo test -p qls-core -p qls-service --release --quiet
 if ($LASTEXITCODE) { throw "Rust tests failed" }

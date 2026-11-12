@@ -73,6 +73,36 @@ Upstream moves fast. Every platform follows the same release, so:
    GabrieleLozupone/stable-diffusion.cpp --json assets`). Details in
    [engineering-notes.md](engineering-notes.md), "Engine updates".
 
+## Portable ONNX Runtime (SSE4.2 floor, AVX/AVX2 at runtime)
+
+Kokon supports x86-64 processors with **SSE4.2 + POPCNT** (x86-64-v2; a 2010 Xeon X5670 is the
+reference). The engine already ships ggml CPU variants (`x64`, `sse42`, `sandybridge`, `haswell`,
+…) and chooses one at runtime, so it was never the problem. **ONNX Runtime** was: `ort`'s
+prebuilt binaries use an AVX2 baseline and `kokon-service` stopped with `SIGILL` in a static
+initializer before `main` (#53).
+
+Release builds link a portable ONNX Runtime built by `tools/ort-portable/`:
+
+```bash
+bash tools/ort-portable/build-ort-portable.sh   # ONNX Runtime v1.31.0, ~30-90 min
+export ORT_LIB_LOCATION=$HOME/kokon-deps/ort-portable/lib
+bash scripts/build-release-linux.sh
+```
+
+It is compiled with `-march=x86-64-v2` and `onnxruntime_USE_AVX/AVX2/AVX512=OFF` for the
+baseline, while MLAS's AVX/AVX2/AVX-512 kernels keep their own flags and are selected at
+runtime: one binary, SSE4.2 on old CPUs, AVX2/AVX-512 on new ones. Windows uses the same idea
+with MSVC (`tools/ort-portable/build-ort-portable.ps1`). Do not add `-march=native` or turn
+`USE_AVX2` back on. Background: [engineering-notes.md](engineering-notes.md).
+
+To check a build without an old CPU at hand, run it under QEMU's Nehalem model (SSE4.2 +
+POPCNT, no AVX). The 0.12.1 binary fails there exactly as it did on the Xeon:
+
+```bash
+qemu-x86_64 -cpu Nehalem target/release/kokon-service --version
+qemu-x86_64 -cpu Nehalem target/release/kokon-mcp --version
+```
+
 ## Building and testing the Linux app
 
 - Build machine: **WSL Ubuntu-22.04** on the dev PC (installed 2026-10-16; sees the RTX 5070 Ti through
