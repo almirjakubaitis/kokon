@@ -32,6 +32,21 @@ if (-not (Test-Path (Join-Path $Src '.git'))) {
     if ($LASTEXITCODE) { throw "git clone failed" }
 }
 
+# ONNX Runtime applies its dependency patches with `patch --binary -p1 < cmake/patches/...`, and
+# patch compares line endings. ONNX Runtime's .gitattributes sets `* text=auto`, so on Windows the
+# checkout converts them to CRLF while the dependency sources come from zip archives with LF, and
+# `patch` stops with "different line endings" (the CI failed at cmake/patches/onnx/onnx.patch).
+# Write the patch files back as the repository stores them; source files are fine with CRLF.
+if ($IsWindows) {
+    Get-ChildItem -Recurse -Path (Join-Path $Src 'cmake\patches') -Filter '*.patch' -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            $text = [IO.File]::ReadAllText($_.FullName)
+            if ($text.Contains("`r`n")) {
+                [IO.File]::WriteAllText($_.FullName, $text.Replace("`r`n", "`n"))
+            }
+        }
+}
+
 # A CMake generator name is tied to one Visual Studio major version: "Visual Studio 17 2022"
 # fails with "could not find any instance of Visual Studio" on a machine or CI image that ships
 # Visual Studio 2026. Ask vswhere which C++ toolchain is installed instead of guessing, and use

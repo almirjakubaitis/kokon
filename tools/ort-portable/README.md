@@ -52,6 +52,12 @@ Studio generator), it retries with Ninja after importing the MSVC environment fr
 `vcvarsall.bat`. `KOKON_CMAKE_GENERATOR` overrides the choice, e.g. `Ninja` from a Developer
 PowerShell.
 
+ONNX Runtime applies its dependency patches with `patch --binary -p1 < cmake/patches/...`, and its
+`.gitattributes` (`* text=auto`) converts a Windows checkout to CRLF while the dependency sources
+come from zip archives with LF. `patch` compares line endings, so a CRLF copy of a patch file
+fails with "different line endings" (the CI hit this with `cmake/patches/onnx/onnx.patch`). The
+script writes the `.patch` files back with LF before configuring.
+
 ## Requirements and notes
 
 - ONNX Runtime **v1.31.0** is the version `ort = 2.0.0-rc.14` (feature `api-31`) expects.
